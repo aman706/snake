@@ -1,411 +1,275 @@
-// Get DOM elements
-const canvas = document.getElementById('game');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
-const highscoreEl = document.getElementById('highscore');
-const pauseBtn = document.getElementById('pauseBtn');
 const restartBtn = document.getElementById('restartBtn');
-const difficultySelect = document.getElementById('difficulty');
-const themeSelect = document.getElementById('theme');
-const modeToggle = document.getElementById('modeToggle');
-const countdownEl = document.getElementById('countdown');
-const achievementsEl = document.getElementById('achievements');
-const btnUp = document.getElementById('btn-up');
-const btnDown = document.getElementById('btn-down');
-const btnLeft = document.getElementById('btn-left');
-const btnRight = document.getElementById('btn-right');
 
-const box = 20;
-const rowCount = canvas.width / box;
-const colCount = canvas.height / box;
+const cellSize = 25;
+const rows = 20;
+const cols = 30;
+
+// Responsive canvas sizing (max width 100vw, height by aspect ratio 3:2)
+function resizeCanvas() {
+  const maxWidth = window.innerWidth - 32; // padding
+  canvas.width = cols * cellSize;
+  canvas.height = rows * cellSize;
+  if (canvas.width > maxWidth) {
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (maxWidth * rows) / cols + 'px';
+  } else {
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+  }
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
 
 let snake = [];
 let direction = 'RIGHT';
+let nextDirection = 'RIGHT';
 let food = {};
 let score = 0;
-let highScore = 0;
-let gameInterval = null;
-let speed = 125;
-let paused = false;
-let countdown = 3;
-let gameStarted = false;
-let achievements = new Set();
+let gameOver = false;
+let gameInterval;
 
-// Load sounds
-const eatSound = new Audio('https://actions.google.com/sounds/v1/food/chomp.ogg');
-const gameOverSound = new Audio('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
-const bgMusic = new Audio('https://actions.google.com/sounds/v1/ambiences/underwater_bubbles.ogg');
-bgMusic.loop = true;
-bgMusic.volume = 0.15;
+let gradientOffset = 0; // for animating gradients
+
+function createGradient(x, y, width, height, colorStart, colorEnd) {
+  const grad = ctx.createLinearGradient(x, y, x + width, y + height);
+  grad.addColorStop(0, colorStart);
+  grad.addColorStop(1, colorEnd);
+  return grad;
+}
 
 function init() {
-  // Load high score
-  const savedHigh = localStorage.getItem('snakeHighScore');
-  highScore = savedHigh ? parseInt(savedHigh) : 0;
-  highscoreEl.textContent = highScore;
-
-  // Reset game variables
-  snake = [{ x: 5 * box, y: 5 * box }];
-  direction = 'RIGHT';
-  score = 0;
+  // Load score from localStorage
+  score = parseInt(localStorage.getItem('snakeScore')) || 0;
   scoreEl.textContent = score;
-  achievements.clear();
-  achievementsEl.textContent = '';
 
-  // Place food
+  snake = [
+    { x: 5, y: 10 },
+    { x: 4, y: 10 },
+    { x: 3, y: 10 },
+  ];
+  direction = 'RIGHT';
+  nextDirection = 'RIGHT';
+  gameOver = false;
   placeFood();
-
-  // Set speed from difficulty select
-  speed = parseInt(difficultySelect.value);
-
-  // Set theme
-  setTheme(themeSelect.value);
-
-  paused = false;
-  gameStarted = false;
-
-  countdown = 3;
-  countdownEl.textContent = countdown;
-
   clearInterval(gameInterval);
-
-  startCountdown();
-}
-
-function startCountdown() {
-  countdownEl.style.display = 'block';
-  let count = countdown;
-  const countdownTimer = setInterval(() => {
-    countdownEl.textContent = count === 0 ? 'GO!' : count;
-    if (count === 0) {
-      clearInterval(countdownTimer);
-      countdownEl.style.display = 'none';
-      gameStarted = true;
-      startGame();
-      if (!bgMusic.paused) bgMusic.play();
-    }
-    count--;
-  }, 1000);
-}
-
-function startGame() {
-  if (gameInterval) clearInterval(gameInterval);
-  gameInterval = setInterval(gameLoop, speed);
+  gameInterval = setInterval(gameLoop, 100);
 }
 
 function placeFood() {
-  let newFood;
   do {
-    newFood = {
-      x: Math.floor(Math.random() * rowCount) * box,
-      y: Math.floor(Math.random() * colCount) * box
+    food = {
+      x: Math.floor(Math.random() * cols),
+      y: Math.floor(Math.random() * rows),
     };
-  } while (snake.some(seg => seg.x === newFood.x && seg.y === newFood.y));
-  food = newFood;
+  } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
 }
 
-function draw() {
-  // Clear canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawCell(x, y, colorStart, colorEnd) {
+  const grad = ctx.createLinearGradient(x * cellSize, y * cellSize, x * cellSize + cellSize, y * cellSize + cellSize);
+  grad.addColorStop(0, colorStart);
+  grad.addColorStop(1, colorEnd);
 
-  // Draw food with pulse animation
-  const time = Date.now() / 500;
-  const pulse = Math.sin(time) * 5 + 15;
-  ctx.fillStyle = getThemeColors().food;
-  ctx.beginPath();
-  ctx.arc(food.x + box/2, food.y + box/2, pulse/2, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = grad;
+  ctx.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+}
 
-  // Draw snake with segments as ovals and eyes on head
-  ctx.fillStyle = getThemeColors().snake;
-  snake.forEach((seg, i) => {
-    const radiusX = box / 2.5;
-    const radiusY = box / 2;
-    ctx.beginPath();
-    ctx.ellipse(seg.x + box / 2, seg.y + box / 2, radiusX, radiusY, 0, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Draw eyes on the head
+function drawSnake() {
+  snake.forEach((segment, i) => {
+    // Animate gradient colors cycling
+    const baseHue = (gradientOffset + i * 20) % 360;
     if (i === 0) {
-      const eyeRadius = 3;
-      let eyeX1 = seg.x + box / 4;
-      let eyeX2 = seg.x + box / 4;
-      let eyeY = seg.y + box / 3;
+      // Head gradient - pink to peach
+      const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
+      grad.addColorStop(0, `hsl(${(baseHue + 340) % 360}, 85%, 75%)`);
+      grad.addColorStop(1, `hsl(${(baseHue + 20) % 360}, 100%, 65%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(segment.x * cellSize + 1, segment.y * cellSize + 1, cellSize - 2, cellSize - 2);
 
-      switch(direction) {
-        case 'RIGHT':
-          eyeX1 = seg.x + box * 0.7;
-          eyeX2 = seg.x + box * 0.7;
-          eyeY = seg.y + box / 3;
-          break;
-        case 'LEFT':
-          eyeX1 = seg.x + box * 0.3;
-          eyeX2 = seg.x + box * 0.3;
-          eyeY = seg.y + box / 3;
-          break;
-        case 'UP':
-          eyeX1 = seg.x + box / 3;
-          eyeX2 = seg.x + box * 0.66;
-          eyeY = seg.y + box * 0.3;
-          break;
-        case 'DOWN':
-          eyeX1 = seg.x + box / 3;
-          eyeX2 = seg.x + box * 0.66;
-          eyeY = seg.y + box * 0.7;
-          break;
-      }
-
-      ctx.fillStyle = '#000';
+      // Eyes
+      ctx.fillStyle = '#222';
+      const eyeRadius = cellSize / 10;
       ctx.beginPath();
-      ctx.arc(eyeX1, eyeY, eyeRadius, 0, 2 * Math.PI);
-      ctx.arc(eyeX2, eyeY, eyeRadius, 0, 2 * Math.PI);
+      ctx.arc(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.35, eyeRadius, 0, Math.PI * 2);
+      ctx.arc(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.35, eyeRadius, 0, Math.PI * 2);
       ctx.fill();
-
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(eyeX1, eyeY, eyeRadius / 2, 0, 2 * Math.PI);
-      ctx.arc(eyeX2, eyeY, eyeRadius / 2, 0, 2 * Math.PI);
-      ctx.fill();
+    } else {
+      // Body segments - cycling blue and peach hues
+      const hue1 = (baseHue + 190) % 360;
+      const hue2 = (baseHue + 230) % 360;
+      const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
+      grad.addColorStop(0, `hsl(${hue1}, 80%, 70%)`);
+      grad.addColorStop(1, `hsl(${hue2}, 90%, 75%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(segment.x * cellSize + 1, segment.y * cellSize + 1, cellSize - 2, cellSize - 2);
     }
   });
 }
 
-function update() {
-  if (!gameStarted || paused) return;
+function drawFood() {
+  const x = food.x;
+  const y = food.y;
 
+  const grad = ctx.createRadialGradient(
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 6,
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 2
+  );
+
+  // Animate food gradient between red and orange
+  const foodHue = (gradientOffset * 2) % 360;
+  grad.addColorStop(0, `hsl(${foodHue}, 90%, 80%)`);
+  grad.addColorStop(1, `hsl(${(foodHue + 30) % 360}, 100%, 50%)`);
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 2.5,
+    cellSize / 2.5,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+}
+
+function moveSnake() {
   const head = { ...snake[0] };
 
-  switch(direction) {
-    case 'LEFT': head.x -= box; break;
-    case 'RIGHT': head.x += box; break;
-    case 'UP': head.y -= box; break;
-    case 'DOWN': head.y += box; break;
+  direction = nextDirection;
+
+  if (direction === 'RIGHT') head.x++;
+  else if (direction === 'LEFT') head.x--;
+  else if (direction === 'UP') head.y--;
+  else if (direction === 'DOWN') head.y++;
+
+  // Wall collision
+  if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) {
+    return gameOverHandler();
   }
 
-  // Check collisions with wall
-  if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
-    gameOver();
-    return;
-  }
-
-  // Check collision with self
-  if (snake.some(seg => seg.x === head.x && seg.y === head.y)) {
-    gameOver();
-    return;
+  // Self collision
+  if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+    return gameOverHandler();
   }
 
   snake.unshift(head);
 
-  // Check if food eaten
+  // Food eaten
   if (head.x === food.x && head.y === food.y) {
     score++;
+    localStorage.setItem('snakeScore', score);
     scoreEl.textContent = score;
-    eatSound.play();
-
-    // Save high score
-    if (score > highScore) {
-      highScore = score;
-      localStorage.setItem('snakeHighScore', highScore);
-      highscoreEl.textContent = highScore;
-      showAchievement('New High Score!');
-    }
-
     placeFood();
-    checkAchievements();
-
   } else {
     snake.pop();
   }
 }
 
-function gameLoop() {
-  update();
-  draw();
-}
-
-function gameOver() {
-  paused = true;
+function gameOverHandler() {
+  gameOver = true;
   clearInterval(gameInterval);
-  gameOverSound.play();
-  canvas.style.borderColor = 'red';
+  flashRedBorder(5);
+}
 
-  // Blink effect for 5 seconds before restart
-  let blinkCount = 0;
-  const maxBlinks = 10;
-  const blinkInterval = setInterval(() => {
-    canvas.style.visibility = (canvas.style.visibility === 'hidden') ? 'visible' : 'hidden';
-    blinkCount++;
-    if (blinkCount > maxBlinks) {
-      clearInterval(blinkInterval);
-      canvas.style.visibility = 'visible';
-      canvas.style.borderColor = getThemeColors().border;
-      restartGame();
+function flashRedBorder(times) {
+  let count = 0;
+  let on = false;
+  const interval = setInterval(() => {
+    if (count >= times * 2) {
+      clearInterval(interval);
+      canvas.style.borderColor = '#61dafb';
+      setTimeout(init, 5000);
+      return;
     }
-  }, 500);
+    canvas.style.borderColor = on ? 'red' : '#61dafb';
+    on = !on;
+    count++;
+  }, 400);
 }
 
-function restartGame() {
-  paused = false;
-  init();
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// Change direction safely
-function changeDirection(newDir) {
-  if (paused) return;
-  const opposites = {
-    'LEFT': 'RIGHT',
-    'RIGHT': 'LEFT',
-    'UP': 'DOWN',
-    'DOWN': 'UP',
-  };
-  if (newDir !== opposites[direction]) {
-    direction = newDir;
-  }
+function gameLoop() {
+  if (gameOver) return;
+
+  clearCanvas();
+  moveSnake();
+  drawFood();
+  drawSnake();
+
+  gradientOffset += 2;
+  if (gradientOffset >= 360) gradientOffset = 0;
 }
 
-// Keyboard controls
-document.addEventListener('keydown', e => {
-  switch (e.key.toLowerCase()) {
-    case 'w':
-    case 'arrowup': changeDirection('UP'); break;
-    case 'a':
-    case 'arrowleft': changeDirection('LEFT'); break;
-    case 's':
-    case 'arrowdown': changeDirection('DOWN'); break;
-    case 'd':
-    case 'arrowright': changeDirection('RIGHT'); break;
-  }
+window.addEventListener('keydown', (e) => {
+  if (gameOver) return;
+
+  const key = e.key.toLowerCase();
+
+  if (key === 'w' && direction !== 'DOWN') nextDirection = 'UP';
+  else if (key === 's' && direction !== 'UP') nextDirection = 'DOWN';
+  else if (key === 'a' && direction !== 'RIGHT') nextDirection = 'LEFT';
+  else if (key === 'd' && direction !== 'LEFT') nextDirection = 'RIGHT';
 });
 
-// Button controls
-btnUp.addEventListener('click', () => changeDirection('UP'));
-btnDown.addEventListener('click', () => changeDirection('DOWN'));
-btnLeft.addEventListener('click', () => changeDirection('LEFT'));
-btnRight.addEventListener('click', () => changeDirection('RIGHT'));
-
-// Pause button
-pauseBtn.addEventListener('click', () => {
-  if (!gameStarted) return;
-  paused = !paused;
-  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
-  if (!paused) {
-    startGame();
-  } else {
-    clearInterval(gameInterval);
-  }
-});
-
-// Restart button
-restartBtn.addEventListener('click', () => {
-  if (!gameStarted) {
-    startCountdown();
-  } else {
-    restartGame();
-  }
-});
-
-// Difficulty selector
-difficultySelect.addEventListener('change', () => {
-  speed = parseInt(difficultySelect.value);
-  if (!paused && gameStarted) {
-    startGame();
-  }
-});
-
-// Theme selector
-themeSelect.addEventListener('change', () => {
-  setTheme(themeSelect.value);
-});
-
-modeToggle.addEventListener('click', () => {
-  document.body.classList.toggle('dark-mode');
-});
-
-// Themes config
-const themes = {
-  classic: {
-    snake: '#00ff00',
-    food: '#ff0000',
-    border: '#00ff00',
-  },
-  neon: {
-    snake: '#ff00ff',
-    food: '#00ffff',
-    border: '#ff00ff',
-  },
-  dark: {
-    snake: '#888',
-    food: '#f00',
-    border: '#888',
-  }
-};
-
-function setTheme(name) {
-  document.body.classList.remove('theme-classic', 'theme-neon', 'theme-dark');
-  document.body.classList.add('theme-' + name);
-}
-
-function getThemeColors() {
-  return themes[themeSelect.value] || themes.classic;
-}
-
-// Achievements system
-function checkAchievements() {
-  if (score === 5 && !achievements.has('5pts')) {
-    achievements.add('5pts');
-    showAchievement('5 points reached!');
-  }
-  if (score === 10 && !achievements.has('10pts')) {
-    achievements.add('10pts');
-    showAchievement('10 points reached!');
-  }
-  if (score === 20 && !achievements.has('20pts')) {
-    achievements.add('20pts');
-    showAchievement('20 points reached!');
-  }
-}
-
-function showAchievement(text) {
-  achievementsEl.textContent = text;
-  setTimeout(() => {
-    achievementsEl.textContent = '';
-  }, 3000);
-}
-
-// Mobile swipe detection for controls
 let touchStartX = null;
 let touchStartY = null;
 
-canvas.addEventListener('touchstart', e => {
-  const touch = e.changedTouches[0];
-  touchStartX = touch.screenX;
-  touchStartY = touch.screenY;
-  e.preventDefault();
-}, {passive:false});
+canvas.addEventListener('touchstart', (e) => {
+  if (gameOver) return;
 
-canvas.addEventListener('touchend', e => {
+  const touch = e.touches[0];
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  if (gameOver) return;
+
   if (!touchStartX || !touchStartY) return;
-  const touch = e.changedTouches[0];
-  const dx = touch.screenX - touchStartX;
-  const dy = touch.screenY - touchStartY;
 
-  if (Math.abs(dx) > Math.abs(dy)) {
-    // horizontal swipe
-    if (dx > 30) changeDirection('RIGHT');
-    else if (dx < -30) changeDirection('LEFT');
+  const touch = e.touches[0];
+  const deltaX = touch.clientX - touchStartX;
+  const deltaY = touch.clientY - touchStartY;
+
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    if (deltaX > 20 && direction !== 'LEFT') {
+      nextDirection = 'RIGHT';
+      touchStartX = null;
+      touchStartY = null;
+    } else if (deltaX < -20 && direction !== 'RIGHT') {
+      nextDirection = 'LEFT';
+      touchStartX = null;
+      touchStartY = null;
+    }
   } else {
-    // vertical swipe
-    if (dy > 30) changeDirection('DOWN');
-    else if (dy < -30) changeDirection('UP');
+    if (deltaY > 20 && direction !== 'UP') {
+      nextDirection = 'DOWN';
+      touchStartX = null;
+      touchStartY = null;
+    } else if (deltaY < -20 && direction !== 'DOWN') {
+      nextDirection = 'UP';
+      touchStartX = null;
+      touchStartY = null;
+    }
   }
+});
 
-  touchStartX = null;
-  touchStartY = null;
-  e.preventDefault();
-}, {passive:false});
+restartBtn.addEventListener('click', () => {
+  init();
+  canvas.focus();
+});
 
-// Start game on load
 init();
-
-// Auto-focus canvas for keyboard control on desktop
 canvas.focus();
