@@ -1,68 +1,25 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  user-select: none;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Colorful Snake Game</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="light">
+  <h1>Colorful Snake Game</h1>
+  <canvas id="gameCanvas" tabindex="0" aria-label="Snake game"></canvas>
 
-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #f9f8f7, #a8edea);
-  min-height: 100vh;
-  padding: 1rem;
-}
+  <div class="info">
+    <div>Score: <span id="score">0</span></div>
+    <button id="restartBtn">Restart</button>
+    <button id="toggleModeBtn">Dark Mode</button>
+  </div>
 
-h1 {
-  margin-bottom: 1rem;
-  color: #333;
-  text-shadow: 1px 1px 3px rgba(255, 255, 255, 0.7);
-  user-select: none;
-}
+  <footer>
+    <p>Created by Aminul Haque</p>
+  </footer>
 
-#gameCanvas {
-  background: linear-gradient(45deg, #004e92, #000428);
-  border: 5px solid #61dafb;
-  border-radius: 20px;
-  box-shadow: 0 0 20px #61dafbaa;
-  outline: none;
-  touch-action: none;
-  max-width: 100vw;
-  height: auto;
-  aspect-ratio: 3 / 2;
-}
-
-.info {
-  margin-top: 1rem;
-  font-size: 1.2rem;
-  color: #222;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-button {
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: bold;
-  color: #fff;
-  box-shadow: 0 4px 8px #fda085bb;
-  transition: background 0.3s ease;
-}
-
-button:hover {
-  background: linear-gradient(135deg, #fda085 0%, #f6d365 100%);
-}
-
-footer {
-  margin-top: 2rem;
-  color: #555;
-  font-style: italic;
-  font-size: 0.9rem;
-  user-select: none;
-}
+  <script src="script.js"></script>
+</body>
+</html>
