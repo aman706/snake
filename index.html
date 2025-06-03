@@ -1,46 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Advanced Mobile Snake Game</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Colorful Snake Game</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="game-container">
-    <h1>Snake Game</h1>
-    <div id="scoreboard">
-      Score: <span id="score">0</span> |
-      High Score: <span id="highscore">0</span>
-    </div>
-    <canvas id="game" width="400" height="400" tabindex="0"></canvas>
+  <h1>Colorful Snake Game</h1>
+  <canvas id="gameCanvas" tabindex="0"></canvas>
 
-    <div id="controls">
-      <button id="btn-up" aria-label="Up">↑</button><br />
-      <button id="btn-left" aria-label="Left">←</button>
-      <button id="btn-down" aria-label="Down">↓</button>
-      <button id="btn-right" aria-label="Right">→</button>
-    </div>
-
-    <div id="info">
-      <button id="pauseBtn">Pause</button>
-      <button id="restartBtn">Restart</button>
-      <select id="difficulty">
-        <option value="200">Easy</option>
-        <option value="125" selected>Medium</option>
-        <option value="75">Hard</option>
-      </select>
-      <select id="theme">
-        <option value="classic" selected>Classic</option>
-        <option value="neon">Neon</option>
-        <option value="dark">Dark</option>
-      </select>
-      <button id="modeToggle" aria-label="Toggle Dark Mode">Dark Mode</button>
-    </div>
-
-    <div id="countdown"></div>
-    <div id="achievements"></div>
+  <div class="info">
+    <div>Score: <span id="score">0</span></div>
+    <button id="restartBtn">Restart</button>
   </div>
+
+  <footer>
+    <p>Created by Aminl Haque</p>
+  </footer>
 
   <script src="script.js"></script>
 </body>
