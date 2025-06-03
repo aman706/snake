@@ -2,6 +2,8 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const restartBtn = document.getElementById('restartBtn');
+const toggleModeBtn = document.getElementById('toggleModeBtn');
+const body = document.body;
 
 const cellSize = 25;
 const rows = 20;
@@ -39,7 +41,7 @@ let bonusInterval = 5;
 let bonusTimeoutId = null;
 
 function init() {
-  score = parseInt(localStorage.getItem('snakeScore')) || 0;
+  score = 0;
   scoreEl.textContent = score;
 
   snake = [
@@ -82,7 +84,6 @@ function placeBonusFood() {
     (food.x === bonusFood.x && food.y === bonusFood.y)
   );
 
-  // Bonus food disappears after 7 seconds if not eaten
   bonusTimeoutId = setTimeout(() => {
     bonusFood = null;
   }, 7000);
@@ -102,126 +103,134 @@ function drawSnake() {
     const baseHue = (gradientOffset + i * 20) % 360;
     if (i === 0) {
       const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
-      grad.addColorStop(0, `hsl(${(baseHue + 340) % 360}, 85%, 75%)`);
-      grad.addColorStop(1, `hsl(${(baseHue + 20) % 360}, 100%, 65%)`);
+      grad.addColorStop(0, `hsl(${baseHue}, 100%, 55%)`);
+      grad.addColorStop(1, `hsl(${(baseHue + 60) % 360}, 100%, 65%)`);
       ctx.fillStyle = grad;
       ctx.fillRect(segment.x * cellSize + 1, segment.y * cellSize + 1, cellSize - 2, cellSize - 2);
 
-      // Eyes
-      ctx.fillStyle = '#222';
-      const eyeRadius = cellSize / 10;
-      ctx.beginPath();
-      ctx.arc(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.35, eyeRadius, 0, Math.PI * 2);
-      ctx.arc(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.35, eyeRadius, 0, Math.PI * 2);
-      ctx.fill();
+      // Snake head eyes
+      ctx.fillStyle = '#fff';
+      const eyeSize = cellSize / 6;
+      if (direction === 'RIGHT') {
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.75, segment.y * cellSize + cellSize * 0.3, eyeSize, eyeSize * 1.3, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.75, segment.y * cellSize + cellSize * 0.7, eyeSize, eyeSize * 1.3, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.75, segment.y * cellSize + cellSize * 0.3, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.75, segment.y * cellSize + cellSize * 0.7, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+      } else if (direction === 'LEFT') {
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.25, segment.y * cellSize + cellSize * 0.3, eyeSize, eyeSize * 1.3, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.25, segment.y * cellSize + cellSize * 0.7, eyeSize, eyeSize * 1.3, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.25, segment.y * cellSize + cellSize * 0.3, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.25, segment.y * cellSize + cellSize * 0.7, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+      } else if (direction === 'UP') {
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.25, eyeSize * 1.3, eyeSize, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.25, eyeSize * 1.3, eyeSize, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.25, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.25, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+      } else if (direction === 'DOWN') {
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.75, eyeSize * 1.3, eyeSize, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.75, eyeSize * 1.3, eyeSize, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.3, segment.y * cellSize + cellSize * 0.75, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.ellipse(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.75, eyeSize / 2, eyeSize / 2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     } else {
-      const hue1 = (baseHue + 190) % 360;
-      const hue2 = (baseHue + 230) % 360;
       const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
-      grad.addColorStop(0, `hsl(${hue1}, 80%, 70%)`);
-      grad.addColorStop(1, `hsl(${hue2}, 90%, 75%)`);
+      grad.addColorStop(0, `hsl(${baseHue}, 80%, 45%)`);
+      grad.addColorStop(1, `hsl(${(baseHue + 50) % 360}, 80%, 55%)`);
       ctx.fillStyle = grad;
-      ctx.fillRect(segment.x * cellSize + 1, segment.y * cellSize + 1, cellSize - 2, cellSize - 2);
+      ctx.fillRect(segment.x * cellSize + 2, segment.y * cellSize + 2, cellSize - 4, cellSize - 4);
     }
   });
 }
 
 function drawFood() {
-  const x = food.x;
-  const y = food.y;
-
-  const grad = ctx.createRadialGradient(
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
-    cellSize / 6,
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
-    cellSize / 2
-  );
-
-  const foodHue = (gradientOffset * 2) % 360;
-  grad.addColorStop(0, `hsl(${foodHue}, 90%, 80%)`);
-  grad.addColorStop(1, `hsl(${(foodHue + 30) % 360}, 100%, 50%)`);
-
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.ellipse(
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
-    cellSize / 2.5,
-    cellSize / 2.5,
-    0,
-    0,
-    Math.PI * 2
-  );
-  ctx.fill();
+  drawCell(food.x, food.y, '#ff6b6b', '#ff3d3d');
 }
 
 function drawBonusFood() {
   if (!bonusFood) return;
-
-  const x = bonusFood.x;
-  const y = bonusFood.y;
-
-  const grad = ctx.createRadialGradient(
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
+  const glowGradient = ctx.createRadialGradient(
+    bonusFood.x * cellSize + cellSize / 2,
+    bonusFood.y * cellSize + cellSize / 2,
     cellSize / 6,
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
+    bonusFood.x * cellSize + cellSize / 2,
+    bonusFood.y * cellSize + cellSize / 2,
     cellSize / 2
   );
+  glowGradient.addColorStop(0, '#ffd54f');
+  glowGradient.addColorStop(1, 'transparent');
 
-  // Yellow-orange glowing bonus food
-  const foodHue = (gradientOffset * 4 + 50) % 360;
-  grad.addColorStop(0, `hsl(${foodHue}, 100%, 80%)`);
-  grad.addColorStop(1, `hsl(${(foodHue + 40) % 360}, 100%, 45%)`);
-
-  ctx.fillStyle = grad;
+  ctx.fillStyle = glowGradient;
   ctx.beginPath();
-  ctx.ellipse(
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
-    cellSize / 2.2,
-    cellSize / 2.2,
-    0,
-    0,
-    Math.PI * 2
-  );
+  ctx.arc(bonusFood.x * cellSize + cellSize / 2, bonusFood.y * cellSize + cellSize / 2, cellSize / 2, 0, 2 * Math.PI);
   ctx.fill();
 
-  // Bonus glow outline
-  ctx.strokeStyle = `hsl(${foodHue}, 100%, 75%)`;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(
-    x * cellSize + cellSize / 2,
-    y * cellSize + cellSize / 2,
-    cellSize / 2.2,
-    cellSize / 2.2,
-    0,
-    0,
-    Math.PI * 2
-  );
-  ctx.stroke();
+  drawCell(bonusFood.x, bonusFood.y, '#f9a825', '#ffca28');
+}
+
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function vibrateDevice() {
+  if (navigator.vibrate) {
+    navigator.vibrate([300, 200, 300]);
+  }
+}
+
+function flashRedBorder(times) {
+  let count = 0;
+  let on = false;
+  const interval = setInterval(() => {
+    if (count >= times * 2) {
+      clearInterval(interval);
+      canvas.style.borderColor = body.classList.contains('dark') ? '#bb86fc' : '#61dafb';
+      return;
+    }
+    canvas.style.borderColor = on ? 'red' : (body.classList.contains('dark') ? '#bb86fc' : '#61dafb');
+    on = !on;
+    count++;
+  }, 400);
 }
 
 function moveSnake() {
-  const head = { ...snake[0] };
-
   direction = nextDirection;
+  const head = { ...snake[0] };
 
   if (direction === 'RIGHT') head.x++;
   else if (direction === 'LEFT') head.x--;
   else if (direction === 'UP') head.y--;
   else if (direction === 'DOWN') head.y++;
 
+  // Check collisions with wall
   if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) {
-    return gameOverHandler();
+    gameOverHandler();
+    return;
   }
 
-  if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-    return gameOverHandler();
+  // Check collisions with itself
+  if (snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+    gameOverHandler();
+    return;
   }
 
   snake.unshift(head);
@@ -229,18 +238,15 @@ function moveSnake() {
   // Check if ate bonus food
   if (bonusFood && head.x === bonusFood.x && head.y === bonusFood.y) {
     score += 5;
-    localStorage.setItem('snakeScore', score);
     scoreEl.textContent = score;
     bonusFood = null;
     clearTimeout(bonusTimeoutId);
-    // Increase bonus interval by 2
     bonusInterval += 2;
   }
   // Check if ate normal food
   else if (head.x === food.x && head.y === food.y) {
     score++;
     foodsEaten++;
-    localStorage.setItem('snakeScore', score);
     scoreEl.textContent = score;
     placeFood();
 
@@ -258,32 +264,6 @@ function gameOverHandler() {
   clearInterval(gameInterval);
   vibrateDevice();
   flashRedBorder(5);
-}
-
-function vibrateDevice() {
-  if (navigator.vibrate) {
-    navigator.vibrate([300, 200, 300]);
-  }
-}
-
-function flashRedBorder(times) {
-  let count = 0;
-  let on = false;
-  const interval = setInterval(() => {
-    if (count >= times * 2) {
-      clearInterval(interval);
-      canvas.style.borderColor = '#61dafb';
-      setTimeout(init, 5000);
-      return;
-    }
-    canvas.style.borderColor = on ? 'red' : '#61dafb';
-    on = !on;
-    count++;
-  }, 400);
-}
-
-function clearCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 function gameLoop() {
@@ -353,9 +333,23 @@ canvas.addEventListener('touchmove', (e) => {
   }
 });
 
+// Restart button manually restarts the game
 restartBtn.addEventListener('click', () => {
   init();
   canvas.focus();
+});
+
+// Dark mode toggle button
+toggleModeBtn.addEventListener('click', () => {
+  if (body.classList.contains('dark')) {
+    body.classList.remove('dark');
+    toggleModeBtn.textContent = 'Dark Mode';
+    canvas.style.borderColor = '#61dafb';
+  } else {
+    body.classList.add('dark');
+    toggleModeBtn.textContent = 'Light Mode';
+    canvas.style.borderColor = '#bb86fc';
+  }
 });
 
 init();
