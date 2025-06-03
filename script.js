@@ -7,9 +7,8 @@ const cellSize = 25;
 const rows = 20;
 const cols = 30;
 
-// Responsive canvas sizing (max width 100vw, height by aspect ratio 3:2)
 function resizeCanvas() {
-  const maxWidth = window.innerWidth - 32; // padding
+  const maxWidth = window.innerWidth - 32;
   canvas.width = cols * cellSize;
   canvas.height = rows * cellSize;
   if (canvas.width > maxWidth) {
@@ -28,21 +27,18 @@ let snake = [];
 let direction = 'RIGHT';
 let nextDirection = 'RIGHT';
 let food = {};
+let bonusFood = null;
 let score = 0;
 let gameOver = false;
 let gameInterval;
 
-let gradientOffset = 0; // for animating gradients
+let gradientOffset = 0;
 
-function createGradient(x, y, width, height, colorStart, colorEnd) {
-  const grad = ctx.createLinearGradient(x, y, x + width, y + height);
-  grad.addColorStop(0, colorStart);
-  grad.addColorStop(1, colorEnd);
-  return grad;
-}
+let foodsEaten = 0;
+let bonusInterval = 5;
+let bonusTimeoutId = null;
 
 function init() {
-  // Load score from localStorage
   score = parseInt(localStorage.getItem('snakeScore')) || 0;
   scoreEl.textContent = score;
 
@@ -54,6 +50,10 @@ function init() {
   direction = 'RIGHT';
   nextDirection = 'RIGHT';
   gameOver = false;
+  foodsEaten = 0;
+  bonusInterval = 5;
+  bonusFood = null;
+  clearTimeout(bonusTimeoutId);
   placeFood();
   clearInterval(gameInterval);
   gameInterval = setInterval(gameLoop, 100);
@@ -65,7 +65,27 @@ function placeFood() {
       x: Math.floor(Math.random() * cols),
       y: Math.floor(Math.random() * rows),
     };
-  } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+  } while (
+    snake.some(seg => seg.x === food.x && seg.y === food.y) ||
+    (bonusFood && bonusFood.x === food.x && bonusFood.y === food.y)
+  );
+}
+
+function placeBonusFood() {
+  do {
+    bonusFood = {
+      x: Math.floor(Math.random() * cols),
+      y: Math.floor(Math.random() * rows),
+    };
+  } while (
+    snake.some(seg => seg.x === bonusFood.x && seg.y === bonusFood.y) ||
+    (food.x === bonusFood.x && food.y === bonusFood.y)
+  );
+
+  // Bonus food disappears after 7 seconds if not eaten
+  bonusTimeoutId = setTimeout(() => {
+    bonusFood = null;
+  }, 7000);
 }
 
 function drawCell(x, y, colorStart, colorEnd) {
@@ -79,10 +99,8 @@ function drawCell(x, y, colorStart, colorEnd) {
 
 function drawSnake() {
   snake.forEach((segment, i) => {
-    // Animate gradient colors cycling
     const baseHue = (gradientOffset + i * 20) % 360;
     if (i === 0) {
-      // Head gradient - pink to peach
       const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
       grad.addColorStop(0, `hsl(${(baseHue + 340) % 360}, 85%, 75%)`);
       grad.addColorStop(1, `hsl(${(baseHue + 20) % 360}, 100%, 65%)`);
@@ -97,7 +115,6 @@ function drawSnake() {
       ctx.arc(segment.x * cellSize + cellSize * 0.7, segment.y * cellSize + cellSize * 0.35, eyeRadius, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // Body segments - cycling blue and peach hues
       const hue1 = (baseHue + 190) % 360;
       const hue2 = (baseHue + 230) % 360;
       const grad = ctx.createLinearGradient(segment.x * cellSize, segment.y * cellSize, segment.x * cellSize + cellSize, segment.y * cellSize + cellSize);
@@ -122,7 +139,6 @@ function drawFood() {
     cellSize / 2
   );
 
-  // Animate food gradient between red and orange
   const foodHue = (gradientOffset * 2) % 360;
   grad.addColorStop(0, `hsl(${foodHue}, 90%, 80%)`);
   grad.addColorStop(1, `hsl(${(foodHue + 30) % 360}, 100%, 50%)`);
@@ -141,6 +157,55 @@ function drawFood() {
   ctx.fill();
 }
 
+function drawBonusFood() {
+  if (!bonusFood) return;
+
+  const x = bonusFood.x;
+  const y = bonusFood.y;
+
+  const grad = ctx.createRadialGradient(
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 6,
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 2
+  );
+
+  // Yellow-orange glowing bonus food
+  const foodHue = (gradientOffset * 4 + 50) % 360;
+  grad.addColorStop(0, `hsl(${foodHue}, 100%, 80%)`);
+  grad.addColorStop(1, `hsl(${(foodHue + 40) % 360}, 100%, 45%)`);
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 2.2,
+    cellSize / 2.2,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // Bonus glow outline
+  ctx.strokeStyle = `hsl(${foodHue}, 100%, 75%)`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(
+    x * cellSize + cellSize / 2,
+    y * cellSize + cellSize / 2,
+    cellSize / 2.2,
+    cellSize / 2.2,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.stroke();
+}
+
 function moveSnake() {
   const head = { ...snake[0] };
 
@@ -151,24 +216,38 @@ function moveSnake() {
   else if (direction === 'UP') head.y--;
   else if (direction === 'DOWN') head.y++;
 
-  // Wall collision
   if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) {
     return gameOverHandler();
   }
 
-  // Self collision
   if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
     return gameOverHandler();
   }
 
   snake.unshift(head);
 
-  // Food eaten
-  if (head.x === food.x && head.y === food.y) {
+  // Check if ate bonus food
+  if (bonusFood && head.x === bonusFood.x && head.y === bonusFood.y) {
+    score += 5;
+    localStorage.setItem('snakeScore', score);
+    scoreEl.textContent = score;
+    bonusFood = null;
+    clearTimeout(bonusTimeoutId);
+    // Increase bonus interval by 2
+    bonusInterval += 2;
+  }
+  // Check if ate normal food
+  else if (head.x === food.x && head.y === food.y) {
     score++;
+    foodsEaten++;
     localStorage.setItem('snakeScore', score);
     scoreEl.textContent = score;
     placeFood();
+
+    if (foodsEaten >= bonusInterval) {
+      foodsEaten = 0;
+      placeBonusFood();
+    }
   } else {
     snake.pop();
   }
@@ -177,7 +256,14 @@ function moveSnake() {
 function gameOverHandler() {
   gameOver = true;
   clearInterval(gameInterval);
+  vibrateDevice();
   flashRedBorder(5);
+}
+
+function vibrateDevice() {
+  if (navigator.vibrate) {
+    navigator.vibrate([300, 200, 300]);
+  }
 }
 
 function flashRedBorder(times) {
@@ -206,6 +292,7 @@ function gameLoop() {
   clearCanvas();
   moveSnake();
   drawFood();
+  drawBonusFood();
   drawSnake();
 
   gradientOffset += 2;
